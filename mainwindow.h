@@ -65,8 +65,11 @@ public slots:
     void    EvLeaveProc();
     void    EvUdp();//对UDP数据报进行处理
     void    EvReFresh();//刷新列表
+    void    EvPrint();//打印子进程中的标准输入输出数据
 private slots:
     void on_refreshButton_clicked();
+    void on_addUserButton_clicked();
+    void on_sendButton_clicked();
 };
 
 #endif // MAINWINDOW_H

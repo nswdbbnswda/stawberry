@@ -17,7 +17,7 @@
    </size>
   </property>
   <property name="windowTitle">
-   <string>Stawberry</string>
+   <string>Strawberry</string>
   </property>
   <widget class="QWidget" name="centralWidget">
    <widget class="QTextEdit" name="textEdit">
@@ -41,22 +41,6 @@
     </property>
     <property name="text">
      <string>刷新</string>
-    </property>
-   </widget>
-   <widget class="QTextBrowser" name="textBrowser">
-    <property name="geometry">
-     <rect>
-      <x>5</x>
-      <y>5</y>
-      <width>491</width>
-      <height>291</height>
-     </rect>
-    </property>
-    <property name="minimumSize">
-     <size>
-      <width>491</width>
-      <height>0</height>
-     </size>
     </property>
    </widget>
    <widget class="QLabel" name="label">
@@ -124,30 +108,60 @@
      <enum>Qt::Vertical</enum>
     </property>
    </widget>
-   <widget class="QPushButton" name="pushButton">
+   <widget class="QPushButton" name="sendButton">
     <property name="geometry">
      <rect>
-      <x>10</x>
+      <x>190</x>
       <y>360</y>
       <width>151</width>
-      <height>23</height>
+      <height>21</height>
      </rect>
     </property>
     <property name="text">
      <string>发送</string>
     </property>
    </widget>
-   <widget class="QPushButton" name="refreshButton_2">
+   <widget class="QPushButton" name="addUserButton">
     <property name="geometry">
      <rect>
       <x>501</x>
-      <y>100</y>
+      <y>360</y>
       <width>51</width>
       <height>21</height>
      </rect>
     </property>
     <property name="text">
      <string>添加用户</string>
+    </property>
+   </widget>
+   <widget class="QLineEdit" name="lineEdit">
+    <property name="geometry">
+     <rect>
+      <x>396</x>
+      <y>360</y>
+      <width>100</width>
+      <height>21</height>
+     </rect>
+    </property>
+   </widget>
+   <widget class="QListWidget" name="listWidget">
+    <property name="geometry">
+     <rect>
+      <x>5</x>
+      <y>5</y>
+      <width>110</width>
+      <height>291</height>
+     </rect>
+    </property>
+   </widget>
+   <widget class="QTextBrowser" name="textBrowser">
+    <property name="geometry">
+     <rect>
+      <x>120</x>
+      <y>5</y>
+      <width>376</width>
+      <height>291</height>
+     </rect>
     </property>
    </widget>
   </widget>
