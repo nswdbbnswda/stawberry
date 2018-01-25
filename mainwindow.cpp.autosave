@@ -226,6 +226,7 @@ void MainWindow::EvSendFile(QString qstrIpAddr, QStringList qstrContext)
     arguments1<<qstrContext;
     qsPort = arguments1.at(arguments1.indexOf("-p") + 1);//找到端口号
     StartSendProcess(arguments1);//启动本地文件发送进程,如果发送进程启动失败了，就不要给远程发送端口号了
+    
     SendControlCommand(qstrIpAddr,qsPort.toStdString().data());//发送端口号
 }
 

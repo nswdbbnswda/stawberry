@@ -24,6 +24,7 @@
 #include"IPMsg.h"
 #include<QNetworkInterface>
 #include<QListWidgetItem>
+#include<QColor>
 
 namespace Ui {
 class MainWindow;
