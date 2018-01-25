@@ -229,6 +229,19 @@
      <string/>
     </property>
    </widget>
+   <widget class="QPushButton" name="killProButton">
+    <property name="geometry">
+     <rect>
+      <x>501</x>
+      <y>100</y>
+      <width>51</width>
+      <height>21</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>杀掉进程</string>
+    </property>
+   </widget>
   </widget>
  </widget>
  <layoutdefault spacing="6" margin="11"/>

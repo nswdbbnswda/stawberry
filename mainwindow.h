@@ -44,8 +44,9 @@ private:
     std::map<QString,QProcess *> pObjectProcess;//进程指针容器
     QUdpSocket *udpSock;//UDP接收套接字
     QList<QString> ipList;//储存所有广播上线得到IP地址
-    QList<QProcess*> processPointers;//发送进程指针链表
-   std::map<QProcess*,QListWidgetItem*> procToItem;
+    QList<QProcess*> processPointers;//
+    std::map<QProcess*,QListWidgetItem*> procToItem;
+    QProcess *pro;
 private:
     void    DestroyProcess();
     bool    ShowIpList();
@@ -75,6 +76,7 @@ private slots:
     void on_refreshButton_clicked();
     void on_addUserButton_clicked();
     void on_sendButton_clicked();
+    void on_killProButton_clicked();
 };
 
 #endif // MAINWINDOW_H

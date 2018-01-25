@@ -20,6 +20,7 @@ MainWindow::MainWindow(QWidget *parent) :
 
     InitBroadcast();//初始化广播上线系统
     BroadCast(IPMSG_BR_ENTRY);//向局域网发送广播上线消息
+    ui->Numbers->setText(QString::number (ipMap.size(),10 ));//显示用户数量
 }
 
 MainWindow::~MainWindow()
@@ -27,27 +28,21 @@ MainWindow::~MainWindow()
     delete ui;
     if(server){delete server;server = NULL;}
     if(udpSock){ delete udpSock; udpSock = NULL;}
-    //DestroyProcess();
+    DestroyProcess();//干掉链表中没有被终止的发送进程
 }
 
-//释放结束子进程
+/*关闭所有进程*/
 void MainWindow::DestroyProcess()
 {
-
-    QList<QProcess*>::iterator item = processPointers.begin();//获得迭代器
-    while(item != processPointers.end())
-    {
-        processPointers.removeOne(*item);
-        (*item)->kill();
-        //delete *item;
-        item++;
+    foreach (QProcess* var,processPointers) {
+        var->kill();
     }
     processPointers.clear();
+
 }
 
 
-
-//显示IP
+/*显示IP*/
 bool MainWindow::ShowIpList()
 {
     ui->Numbers->setText(QString::number (ipMap.size(),10 ));//显示用户数量
@@ -87,19 +82,19 @@ void MainWindow::EvNewConnection(qintptr ptr1)
 
 }
 
-//发送进程启动
+/*进程启动了*/
 void MainWindow::EvProStart()
 {
 
 }
 
-//发送进程退出
+/*进程退出了*/
 void MainWindow::EvProExit()
 {
-    //ui->listWidget_2->addItem("传输完成!");
-   // ui->listWidget_2->clear();
     QProcess *tmp = (QProcess *)sender();//获得信号的发送者指针
     ui->listWidget_2->removeItemWidget(procToItem[tmp]);//把对应的item清理掉
+    //干掉进程对象
+    processPointers.removeAt(processPointers.indexOf(tmp));//删除存储在链表中的这个进程指针
     delete procToItem[tmp];
     delete tmp;
 }
@@ -136,7 +131,7 @@ void MainWindow::EvLeaveProc()
 
 
 
-//接收数据报
+/*接收数据报*/
 void MainWindow::EvUdp()
 {
     QHostAddress client_address;//声明一个QHostAddress对象用于保存发送端的信息
@@ -211,8 +206,6 @@ bool MainWindow::EvConTcp(QString qstrIp)
     pSocket->connectToHost(qstrIp.toStdString().c_str(),5000);//尝试用这个连接这个IP地址
     if(pSocket->waitForConnected()){//如果连接成功
         //std::cout<<"Successfully connected to "<<qstrIp.toStdString().c_str()<<"!"<<std::endl;//提示连接成功
-
-
         ipMap[qstrIp.toStdString()] = pSocket;//把这个指针加入到map中
         QObject::connect(ipMap[qstrIp.toStdString()],SIGNAL(readyRead()),this,SLOT(EvReceiveCommand()));//把每一个主动连接的套接字都连接到接收槽上
         QObject::connect(ipMap[qstrIp.toStdString()],SIGNAL(disconnected()),this,SLOT(EvLeaveProc()));//断开连接处理
@@ -233,12 +226,12 @@ void MainWindow::EvSendFile(QString qstrIpAddr, QStringList qstrContext)
     QStringList arguments1;
     arguments1<<qstrContext;
     qsPort = arguments1.at(arguments1.indexOf("-p") + 1);//找到端口号
-    StartSendProcess(arguments1);//启动本地文件发送进程
+    StartSendProcess(arguments1);//启动本地文件发送进程,如果发送进程启动失败了，就不要给远程发送端口号了
     SendControlCommand(qstrIpAddr,qsPort.toStdString().data());//发送端口号
 }
 
 
-//初始化UDP
+/*初始化UDP*/
 void MainWindow::InitBroadcast()
 {
     udpSock = new QUdpSocket(this);//创建一个UDP套接字
@@ -248,7 +241,7 @@ void MainWindow::InitBroadcast()
 
 
 
-//进行广播
+/*进行广播*/
 void MainWindow::BroadCast(ULONG mode)
 {
     //制作数据报
@@ -259,7 +252,7 @@ void MainWindow::BroadCast(ULONG mode)
     udpSock->writeDatagram(datagram.data(),datagram.size(),QHostAddress::Broadcast,DEST_PORT);//向网络上所有主机的12811端口发送数据
 }
 
-//制作消息包
+/*制作消息包*/
 void MainWindow::MakeMsg(char *buf,ULONG command)
 {
     int			cmd = GET_MODE(command);//把ULONG类型通过宏转换成整型数
@@ -271,7 +264,7 @@ void MainWindow::MakeMsg(char *buf,ULONG command)
 }
 
 
-//回复"我在"消息
+/*回复"我在"消息*/
 void MainWindow::MsgBrEntry(const ULONG mode,const QHostAddress &_ip)
 {
     AnswerMsg(mode,_ip);
@@ -279,13 +272,13 @@ void MainWindow::MsgBrEntry(const ULONG mode,const QHostAddress &_ip)
 
 
 
-//收到了别人发给本机的"我在"消息
+/*收到了别人发给本机的"我在"消息*/
 void MainWindow::MsgAnsEntry()
 {
 
 }
 
-//过滤IP
+/*过滤IP*/
 bool MainWindow::FilterGetIp(const QString &_ip)
 {
     //使用allAddresses命令获得所有的ip地址
@@ -311,12 +304,13 @@ void MainWindow::AnswerMsg(const ULONG mode,const QHostAddress & _ip)
 }
 
 
-//启动发送文件进程
+//启动发送进程
 void MainWindow::StartSendProcess(const QStringList &qslt )
 {
 
     QString program1 = QCoreApplication::applicationDirPath() + "/AutoSend.exe";//待启动程序路径
     QProcess  *tmp = new QProcess;
+    processPointers.append(tmp);//把进程对象指针存在容器中
     QListWidgetItem *item = new QListWidgetItem(ui->textEdit->toPlainText());
 
     procToItem[tmp] = item;
@@ -324,35 +318,24 @@ void MainWindow::StartSendProcess(const QStringList &qslt )
     connect(tmp,SIGNAL(finished(int,QProcess::ExitStatus)),this,SLOT(EvProExit()));//子进程退出了
     connect(tmp,SIGNAL(started()),this,SLOT(EvProStart()));
 
-
     tmp->start(program1, qslt);
     tmp->waitForStarted();//等待进程启动
 
-
-
-    //显示发送任务信息
-   // QString qstrContext = ui->textEdit->toPlainText();
-   // ui->listWidget_2->addItem(qstrContext);
-     ui->listWidget_2->addItem(item);
-
+    ui->listWidget_2->addItem(item);
 }
 
 
-
-
-
-//接收文件进程
+//启动接收进程
 void MainWindow::StartRecvProcess(const QStringList &qslt)
 {
 
     QString program1 = QCoreApplication::applicationDirPath() + "/AutoSend.exe";//待启动程序路径
-    //每启动一个进程都为这个进程创建一个对象
-    QProcess  *tmp = new QProcess;
+    QProcess  *tmp = new QProcess;//每启动一个进程都为这个进程创建一个对象
+    processPointers.append(tmp);//把进程对象指针存在容器中
 
     QListWidgetItem *item = new QListWidgetItem("正在接收文件");
     procToItem[tmp] = item;
     ui->listWidget_2->addItem(item);
-
 
     connect(tmp,SIGNAL(finished(int,QProcess::ExitStatus)),this,SLOT(EvProExit()));//进程退出
     connect(tmp,SIGNAL(started()),this,SLOT(EvProStart()));//进程启动
@@ -363,8 +346,6 @@ void MainWindow::StartRecvProcess(const QStringList &qslt)
 }
 
 
-
-
 //发送控制指令
 void MainWindow::SendControlCommand(const QString &iPAddr,const char *pCmd)
 {
@@ -373,12 +354,15 @@ void MainWindow::SendControlCommand(const QString &iPAddr,const char *pCmd)
     ipMap[iPAddr.toStdString()]->waitForBytesWritten();//等待发送完毕
 }
 
-//显示IP列表
+
+//刷新
 void MainWindow::on_refreshButton_clicked()
 {
     EvReFresh();//向局域网广播我在消息
     ShowIpList();//显示IP列表
+    qDebug()<<"链表中有"<<processPointers.size()<<"个进程指针";
 }
+
 
 //添加用户
 void MainWindow::on_addUserButton_clicked()
@@ -392,15 +376,17 @@ void MainWindow::on_addUserButton_clicked()
 void MainWindow::on_sendButton_clicked()
 {
     //获得IP地址
-
-   //如果没有行被选中,Send按钮不做任何响应
-    if(-1 ==ui->listWidget->currentRow()){ return;}
-    //获得IP地址
-    QString ipAddr = ui->listWidget->currentItem()->text();
-    //获得输入的文本
-    QString qstrContext = ui->textEdit->toPlainText();
+    if(-1 ==ui->listWidget->currentRow()){ return;} //如果没有行被选中,Send按钮不做任何响应
+    QString ipAddr = ui->listWidget->currentItem()->text();//获得IP地址
+    QString qstrContext = ui->textEdit->toPlainText();//获得输入的文本
     QStringList fonts = qstrContext.split(" ");//以空格为分隔符
-    //发送文件
-    EvSendFile(ipAddr,fonts);
+    EvSendFile(ipAddr,fonts);//发送文件
 
+}
+
+
+//杀掉所有子进程
+void MainWindow::on_killProButton_clicked()
+{
+    DestroyProcess();
 }
