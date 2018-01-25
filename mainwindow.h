@@ -23,6 +23,7 @@
 #include<map>
 #include"IPMsg.h"
 #include<QNetworkInterface>
+#include<QListWidgetItem>
 
 namespace Ui {
 class MainWindow;
@@ -43,8 +44,11 @@ private:
     std::map<QString,QProcess *> pObjectProcess;//进程指针容器
     QUdpSocket *udpSock;//UDP接收套接字
     QList<QString> ipList;//储存所有广播上线得到IP地址
-    bool    ShowIpList();
+    QList<QProcess*> processPointers;//发送进程指针链表
+   std::map<QProcess*,QListWidgetItem*> procToItem;
 private:
+    void    DestroyProcess();
+    bool    ShowIpList();
     bool    IsIpExist(const QString &qstr);//判断TCP容器中是否存该地址
     void    InitBroadcast();
     void    BroadCast(ULONG mode);//向局域网广播消息
@@ -54,7 +58,8 @@ private:
     bool    FilterGetIp(const QString &_ip);
     void    AnswerMsg(const ULONG mode,const QHostAddress &_ip);//回复消息
     void    SendControlCommand(const QString &iPAddr,const char *pCmd);
-    void    StartSendProcess(const QStringList &qslt);
+    void    StartSendProcess(const QStringList &qslt);//发送进程
+    void    StartRecvProcess(const QStringList &qslt );//接收进程
 public slots:
     void    EvReceiveCommand();
     void    EvNewConnection(qintptr ptr1);

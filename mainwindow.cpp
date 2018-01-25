@@ -7,6 +7,7 @@ MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
     ui(new Ui::MainWindow)
 {
+
     ui->setupUi(this);
     server = new MyTcpSever;
     socketDescriptor = 0;
@@ -26,12 +27,30 @@ MainWindow::~MainWindow()
     delete ui;
     if(server){delete server;server = NULL;}
     if(udpSock){ delete udpSock; udpSock = NULL;}
+    //DestroyProcess();
 }
+
+//释放结束子进程
+void MainWindow::DestroyProcess()
+{
+
+    QList<QProcess*>::iterator item = processPointers.begin();//获得迭代器
+    while(item != processPointers.end())
+    {
+        processPointers.removeOne(*item);
+        (*item)->kill();
+        //delete *item;
+        item++;
+    }
+    processPointers.clear();
+}
+
+
 
 //显示IP
 bool MainWindow::ShowIpList()
 {
-
+    ui->Numbers->setText(QString::number (ipMap.size(),10 ));//显示用户数量
     ui->listWidget->clear();
     QString qstr;
     if(ipMap.empty()){return false;}
@@ -68,18 +87,21 @@ void MainWindow::EvNewConnection(qintptr ptr1)
 
 }
 
+//发送进程启动
 void MainWindow::EvProStart()
 {
-    qDebug()<<"正在传输文件...";
+
 }
 
+//发送进程退出
 void MainWindow::EvProExit()
 {
-
+    //ui->listWidget_2->addItem("传输完成!");
+   // ui->listWidget_2->clear();
     QProcess *tmp = (QProcess *)sender();//获得信号的发送者指针
+    ui->listWidget_2->removeItemWidget(procToItem[tmp]);//把对应的item清理掉
+    delete procToItem[tmp];
     delete tmp;
-    ui->textBrowser->clear();
-    qDebug()<<"文件传输完毕!";
 }
 
 
@@ -95,7 +117,7 @@ void MainWindow::EvReceiveCommand()
     //启动接收进程
     QStringList arguments1;//默认保存到应用程序根目录
     arguments1 <<"-c"<<"-i"<<ipaddr.toString()<<"-p"<<temp1.data()<<"-d"<<QCoreApplication::applicationDirPath() + "/DOWNLOAD"; //添加启动参数 -c  -i 127.0.0.1  -p 5002 -d G:/DE
-    StartSendProcess(arguments1);//启动接收进程
+    StartRecvProcess(arguments1);//启动接收进程
 }
 
 
@@ -168,10 +190,11 @@ void MainWindow::EvReFresh()
 //打印子进程输出
 void MainWindow::EvPrint()
 {
-    QProcess *tmp = (QProcess *)sender();//获得信号的发送者指针
-   // qDebug()<<tmp->readAll();
-
-    ui->textBrowser->setText(tmp->readAll());
+//    QProcess *tmp = (QProcess *)sender();//获得信号的发送者指针
+//   // qDebug()<<tmp->readAll();
+//    //ui->listWidget_2->clear();
+//    QString qstrContext = ui->textEdit->toPlainText();
+//    ui->listWidget_2->addItem(qstrContext);
 }
 
 
@@ -199,6 +222,7 @@ bool MainWindow::EvConTcp(QString qstrIp)
     return false;
 }
 
+//发送文件
 void MainWindow::EvSendFile(QString qstrIpAddr, QStringList qstrContext)
 {
     if(!IsIpExist(qstrIpAddr)){//如果map中没有这个地址,退出
@@ -208,7 +232,6 @@ void MainWindow::EvSendFile(QString qstrIpAddr, QStringList qstrContext)
     QString qsPort;
     QStringList arguments1;
     arguments1<<qstrContext;
-
     qsPort = arguments1.at(arguments1.indexOf("-p") + 1);//找到端口号
     StartSendProcess(arguments1);//启动本地文件发送进程
     SendControlCommand(qstrIpAddr,qsPort.toStdString().data());//发送端口号
@@ -291,19 +314,55 @@ void MainWindow::AnswerMsg(const ULONG mode,const QHostAddress & _ip)
 //启动发送文件进程
 void MainWindow::StartSendProcess(const QStringList &qslt )
 {
-    // QString program1 = QCoreApplication::applicationDirPath() + "/AutoSend.exe";//待启动程序路径
-    //  QProcess::startDetached(program1,qslt);//启动AutoSend
 
     QString program1 = QCoreApplication::applicationDirPath() + "/AutoSend.exe";//待启动程序路径
-
-    //每启动一个进程都为这个进程创建一个对象
     QProcess  *tmp = new QProcess;
+    QListWidgetItem *item = new QListWidgetItem(ui->textEdit->toPlainText());
+
+    procToItem[tmp] = item;
+
     connect(tmp,SIGNAL(finished(int,QProcess::ExitStatus)),this,SLOT(EvProExit()));//子进程退出了
-    connect(tmp,SIGNAL(readyRead()),this,SLOT(EvPrint()));
-    //connect(tmp,SIGNAL(started()),this,SLOT(EvProStart()));//
+    connect(tmp,SIGNAL(started()),this,SLOT(EvProStart()));
+
+
     tmp->start(program1, qslt);
     tmp->waitForStarted();//等待进程启动
+
+
+
+    //显示发送任务信息
+   // QString qstrContext = ui->textEdit->toPlainText();
+   // ui->listWidget_2->addItem(qstrContext);
+     ui->listWidget_2->addItem(item);
+
 }
+
+
+
+
+
+//接收文件进程
+void MainWindow::StartRecvProcess(const QStringList &qslt)
+{
+
+    QString program1 = QCoreApplication::applicationDirPath() + "/AutoSend.exe";//待启动程序路径
+    //每启动一个进程都为这个进程创建一个对象
+    QProcess  *tmp = new QProcess;
+
+    QListWidgetItem *item = new QListWidgetItem("正在接收文件");
+    procToItem[tmp] = item;
+    ui->listWidget_2->addItem(item);
+
+
+    connect(tmp,SIGNAL(finished(int,QProcess::ExitStatus)),this,SLOT(EvProExit()));//进程退出
+    connect(tmp,SIGNAL(started()),this,SLOT(EvProStart()));//进程启动
+
+    tmp->start(program1, qslt);
+    tmp->waitForStarted();//等待进程启动
+
+}
+
+
 
 
 //发送控制指令
@@ -343,4 +402,5 @@ void MainWindow::on_sendButton_clicked()
     QStringList fonts = qstrContext.split(" ");//以空格为分隔符
     //发送文件
     EvSendFile(ipAddr,fonts);
+
 }
