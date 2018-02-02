@@ -25,6 +25,7 @@
 #include<QNetworkInterface>
 #include<QListWidgetItem>
 #include<QColor>
+#include<QSharedMemory>
 
 namespace Ui {
 class MainWindow;
@@ -48,6 +49,8 @@ private:
     QList<QProcess*> processPointers;//
     std::map<QProcess*,QListWidgetItem*> procToItem;
     QProcess *pro;
+    QSharedMemory *sharememory;
+    QStringList startCmdList;
 private:
     void    DestroyProcess();
     bool    ShowIpList();
@@ -60,8 +63,12 @@ private:
     bool    FilterGetIp(const QString &_ip);
     void    AnswerMsg(const ULONG mode,const QHostAddress &_ip);//回复消息
     void    SendControlCommand(const QString &iPAddr,const char *pCmd);
-    void    StartSendProcess(const QStringList &qslt);//发送进程
+    bool    StartSendProcess(const QStringList &qslt);//发送进程
     void    StartRecvProcess(const QStringList &qslt );//接收进程
+    bool    ReadShareMemoryData();//读取共享内存数据
+    void    InitShareMem();//初始化共享内存
+    QString ChangePort(QString port);
+    int     GenerateRandomNumber(int left,int right);//生成一个随机数
 public slots:
     void    EvReceiveCommand();
     void    EvNewConnection(qintptr ptr1);
@@ -74,10 +81,10 @@ public slots:
     void    EvReFresh();//刷新列表
     void    EvPrint();//打印子进程中的标准输入输出数据
 private slots:
-    void on_refreshButton_clicked();
-    void on_addUserButton_clicked();
-    void on_sendButton_clicked();
-    void on_killProButton_clicked();
+    void    on_refreshButton_clicked();
+    void    on_addUserButton_clicked();
+    void    on_sendButton_clicked();
+    void    on_killProButton_clicked();
 };
 
 #endif // MAINWINDOW_H

@@ -22,3 +22,4 @@ HEADERS  += mainwindow.h \
     IPMsg.h
 
 FORMS    += mainwindow.ui
+

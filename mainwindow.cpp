@@ -1,5 +1,7 @@
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
+#include<QThread>
+#include<QTime>
 
 
 
@@ -9,6 +11,18 @@ MainWindow::MainWindow(QWidget *parent) :
 {
 
     ui->setupUi(this);
+
+    sharememory = new QSharedMemory();//构造实例对象
+    sharememory->setKey("AutoSend");//为实例对象指定关键字(给共享内存命名)
+    sharememory->detach();//将共享内存与本进程分离
+    //创建共享内存
+    sharememory->create(1);//1字节
+
+    //初始化共享内存
+    InitShareMem();
+
+
+
     server = new MyTcpSever;
     socketDescriptor = 0;
     if (!server->isListening()){//监听
@@ -25,6 +39,7 @@ MainWindow::MainWindow(QWidget *parent) :
 
 MainWindow::~MainWindow()
 {
+    if(sharememory) delete sharememory;
     delete ui;
     if(server){delete server;server = NULL;}
     if(udpSock){ delete udpSock; udpSock = NULL;}
@@ -96,6 +111,9 @@ void MainWindow::EvProExit()
     processPointers.removeAt(processPointers.indexOf(tmp));//删除存储在链表中的这个进程指针
     delete procToItem[tmp];
     delete tmp;
+    if(!ReadShareMemoryData()){
+        qDebug()<<"端口冲突启动失败";
+    }
 }
 
 
@@ -174,14 +192,14 @@ void MainWindow::EvUdp()
 }
 
 
-//刷新用户列表
+/*刷新用户列表*/
 void MainWindow::EvReFresh()
 {
     BroadCast(IPMSG_BR_ENTRY);//向局域网发送广播上线消息
 }
 
 
-//打印子进程输出
+/*打印子进程输出*/
 void MainWindow::EvPrint()
 {
 //    QProcess *tmp = (QProcess *)sender();//获得信号的发送者指针
@@ -190,7 +208,6 @@ void MainWindow::EvPrint()
 //    QString qstrContext = ui->textEdit->toPlainText();
 //    ui->listWidget_2->addItem(qstrContext);
 }
-
 
 
 /*发起TCP连接*/
@@ -214,19 +231,32 @@ bool MainWindow::EvConTcp(QString qstrIp)
     return false;
 }
 
-//发送文件
-void MainWindow::EvSendFile(QString qstrIpAddr, QStringList qstrContext)
+/*发送文件*/
+void MainWindow::EvSendFile(QString qstrIpAddr, QStringList qstrContext)// -s -p 5001 -d G:/moon
 {
     if(!IsIpExist(qstrIpAddr)){//如果map中没有这个地址,退出
         std::cout<<"The address does not exist"<<std::endl;//提示地址不存在，不能进行命令发送
         return;
     }
-    QString qsPort;
+    QString qsPort = QString::number(GenerateRandomNumber(10000,20000),10);//随机选取一个10000-20000之间的端口作为初始尝试启动发送进程端口
+
     QStringList arguments1;
     arguments1<<qstrContext;
+    arguments1.append("-p");
+    arguments1.append(qsPort);
     qsPort = arguments1.at(arguments1.indexOf("-p") + 1);//找到端口号
-    StartSendProcess(arguments1);//启动本地文件发送进程,如果发送进程启动失败了，就不要给远程发送端口号了
-    SendControlCommand(qstrIpAddr,qsPort.toStdString().data());//发送端口号
+
+
+    while(true) {
+        if(StartSendProcess(arguments1)) {//启动本地文件发送进程
+             SendControlCommand(qstrIpAddr,qsPort.toStdString().data());//发送端启动成功,发送端口号给接收端
+             break;
+        }
+        else { //端口冲突了,进行处理
+            qsPort = ChangePort(qsPort);//换一个端口
+            arguments1.replace((arguments1.indexOf("-p") + 1),qsPort);//修改一下启动AutoSend程序所需要的命令行
+        }
+    }
 }
 
 
@@ -291,7 +321,7 @@ bool MainWindow::FilterGetIp(const QString &_ip)
     return true;
 }
 
-//回复消息
+/*回复消息*/
 void MainWindow::AnswerMsg(const ULONG mode,const QHostAddress & _ip)
 {
     //制作数据报
@@ -303,8 +333,8 @@ void MainWindow::AnswerMsg(const ULONG mode,const QHostAddress & _ip)
 }
 
 
-//启动发送进程
-void MainWindow::StartSendProcess(const QStringList &qslt )
+/*启动发送进程*/
+bool MainWindow::StartSendProcess(const QStringList &qslt )
 {
 
     QString program1 = QCoreApplication::applicationDirPath() + "/AutoSend.exe";//待启动程序路径
@@ -313,8 +343,6 @@ void MainWindow::StartSendProcess(const QStringList &qslt )
     QListWidgetItem *item = new QListWidgetItem("正在发送任务："+ui->textEdit->toPlainText());
 
 
-
-    //item->setTextColor(QColor.blue());
     item->setBackgroundColor(QColor(255, 0, 0, 255));
 
     procToItem[tmp] = item;
@@ -325,11 +353,19 @@ void MainWindow::StartSendProcess(const QStringList &qslt )
     tmp->start(program1, qslt);
     tmp->waitForStarted();//等待进程启动
 
+    //等待1s让进程启动等待查看共享内存结果
+    QThread::sleep(1);
+    if(ReadShareMemoryData()) {
     ui->listWidget_2->addItem(item);
+    return true;
+    }
+    else {
+       return false;
+    }
 }
 
 
-//启动接收进程
+/*启动接收进程*/
 void MainWindow::StartRecvProcess(const QStringList &qslt)
 {
 
@@ -353,7 +389,33 @@ void MainWindow::StartRecvProcess(const QStringList &qslt)
 }
 
 
-//发送控制指令
+/*读取共享内存数据*/
+bool  MainWindow::ReadShareMemoryData()
+{
+    //阻塞等待进程外部进程更新共享内存数据
+    return '1' == *((char*)sharememory->data());
+}
+
+//初始化共享内存
+void MainWindow::InitShareMem()
+{
+    //向共享内存中写入数据
+    sharememory->lock();//获得共享内存权限
+    char* byte = (char*)sharememory->data();
+    byte[0] = '1';
+    sharememory->unlock();
+}
+
+//把端口号数值变换一下
+QString MainWindow::ChangePort(QString port)
+{
+    bool ok;
+    int dec = port.toInt(&ok,10) + 1;
+    return QString::number(dec,10);
+}
+
+
+/*发送控制指令*/
 void MainWindow::SendControlCommand(const QString &iPAddr,const char *pCmd)
 {
     std::string numSocket = iPAddr.toStdString();//获得套接字号码
@@ -362,16 +424,17 @@ void MainWindow::SendControlCommand(const QString &iPAddr,const char *pCmd)
 }
 
 
-//刷新
+/*刷新*/
 void MainWindow::on_refreshButton_clicked()
 {
     EvReFresh();//向局域网广播我在消息
     ShowIpList();//显示IP列表
     qDebug()<<"链表中有"<<processPointers.size()<<"个进程指针";
+    GenerateRandomNumber(10000,20000);
 }
 
 
-//添加用户
+/*添加用户*/
 void MainWindow::on_addUserButton_clicked()
 {
     EvConTcp(ui->lineEdit->displayText());
@@ -379,11 +442,11 @@ void MainWindow::on_addUserButton_clicked()
 }
 
 
-//发送文件
+/*发送文件*/
 void MainWindow::on_sendButton_clicked()
 {
     //获得IP地址
-    if(-1 ==ui->listWidget->currentRow()){ return;} //如果没有行被选中,Send按钮不做任何响应
+    if(-1 == ui->listWidget->currentRow()){ return;} //如果没有行被选中,Send按钮不做任何响应
     QString ipAddr = ui->listWidget->currentItem()->text();//获得IP地址
     QString qstrContext = ui->textEdit->toPlainText();//获得输入的文本
     QStringList fonts = qstrContext.split(" ");//以空格为分隔符
@@ -392,8 +455,25 @@ void MainWindow::on_sendButton_clicked()
 }
 
 
-//杀掉所有子进程
+/*杀掉所有子进程*/
 void MainWindow::on_killProButton_clicked()
 {
     DestroyProcess();
 }
+
+
+//产生随机数
+int MainWindow::GenerateRandomNumber(int left,int right)
+{
+    qsrand(QTime(0,0,0).secsTo(QTime::currentTime()));
+    int srandNum = left + qrand() % (right - left);
+    qDebug()<<srandNum;
+    return srandNum;
+}
+
+
+
+
+
+
+
