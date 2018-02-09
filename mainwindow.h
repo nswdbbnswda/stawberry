@@ -26,6 +26,7 @@
 #include<QListWidgetItem>
 #include<QColor>
 #include<QSharedMemory>
+#include<QTimer>
 
 namespace Ui {
 class MainWindow;
@@ -51,6 +52,8 @@ private:
     QProcess *pro;
     QSharedMemory *sharememory;
     QStringList startCmdList;
+    QTimer *printTimer;//打印共享内存数据的定时器
+    std::map<QProcess*,QSharedMemory*> shareObjMap;//共享内存对象Map
 private:
     void    DestroyProcess();
     bool    ShowIpList();
@@ -69,6 +72,7 @@ private:
     void    InitShareMem();//初始化共享内存
     QString ChangePort(QString port);
     int     GenerateRandomNumber(int left,int right);//生成一个随机数
+
 public slots:
     void    EvReceiveCommand();
     void    EvNewConnection(qintptr ptr1);
@@ -80,6 +84,7 @@ public slots:
     void    EvUdp();//对UDP数据报进行处理
     void    EvReFresh();//刷新列表
     void    EvPrint();//打印子进程中的标准输入输出数据
+    void    EvPrintRate();//打印子进程进度
 private slots:
     void    on_refreshButton_clicked();
     void    on_addUserButton_clicked();

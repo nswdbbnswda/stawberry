@@ -35,11 +35,23 @@ MainWindow::MainWindow(QWidget *parent) :
     InitBroadcast();//初始化广播上线系统
     BroadCast(IPMSG_BR_ENTRY);//向局域网发送广播上线消息
     ui->Numbers->setText(QString::number (ipMap.size(),10 ));//显示用户数量
+    EvConTcp("127.0.0.1");
+    ShowIpList();
+
+
+    //定时查看所有共享内存区的进度情况
+    printTimer = new QTimer(this);
+    connect(printTimer,SIGNAL(timeout()),this,SLOT(EvPrintRate()));
+    printTimer->start(1000);
+
+
+
 }
 
 MainWindow::~MainWindow()
 {
     if(sharememory) delete sharememory;
+    if(printTimer)  delete printTimer;
     delete ui;
     if(server){delete server;server = NULL;}
     if(udpSock){ delete udpSock; udpSock = NULL;}
@@ -109,7 +121,15 @@ void MainWindow::EvProExit()
     ui->listWidget_2->removeItemWidget(procToItem[tmp]);//把对应的item清理掉
     //干掉进程对象
     processPointers.removeAt(processPointers.indexOf(tmp));//删除存储在链表中的这个进程指针
+
+    //清理共享内存对象
+
+    delete shareObjMap[tmp];
+    shareObjMap.erase(tmp);
+
+
     delete procToItem[tmp];
+    procToItem.erase(tmp);
     delete tmp;
     if(!ReadShareMemoryData()){
         qDebug()<<"端口冲突启动失败";
@@ -202,11 +222,34 @@ void MainWindow::EvReFresh()
 /*打印子进程输出*/
 void MainWindow::EvPrint()
 {
-//    QProcess *tmp = (QProcess *)sender();//获得信号的发送者指针
-//   // qDebug()<<tmp->readAll();
-//    //ui->listWidget_2->clear();
-//    QString qstrContext = ui->textEdit->toPlainText();
-//    ui->listWidget_2->addItem(qstrContext);
+    QProcess *tmp = (QProcess *)sender();//获得信号的发送者指针
+    QListWidgetItem *item = procToItem[tmp];
+    //item->setText(tmp->readLine());
+}
+
+
+//从共享内存中取出子进程的进度并且输出到UI
+void MainWindow::EvPrintRate()
+{
+     qDebug()<<"Hello,World!";
+     qDebug()<<shareObjMap.size();
+    std::map<QProcess*,QSharedMemory*>::iterator iter;//定义一个迭代指针iter
+    for(iter = shareObjMap.begin(); iter != shareObjMap.end(); iter++) {
+        if(!iter->second) return;
+
+        if(!iter->second->attach()) return;
+        qDebug()<<(char*) iter->second->data();
+        QString itemContext = QString((char*)iter->second->data());
+
+        itemContext.remove("\n");
+
+        if(!procToItem[iter->first]) return;
+
+        procToItem[iter->first]->setText(itemContext);
+
+        iter->second->detach();
+    }
+
 }
 
 
@@ -342,13 +385,13 @@ bool MainWindow::StartSendProcess(const QStringList &qslt )
     processPointers.append(tmp);//把进程对象指针存在容器中
     QListWidgetItem *item = new QListWidgetItem("正在发送任务："+ui->textEdit->toPlainText());
 
-
     item->setBackgroundColor(QColor(255, 0, 0, 255));
 
     procToItem[tmp] = item;
 
     connect(tmp,SIGNAL(finished(int,QProcess::ExitStatus)),this,SLOT(EvProExit()));//子进程退出了
     connect(tmp,SIGNAL(started()),this,SLOT(EvProStart()));
+    connect(tmp,SIGNAL(readyRead()),this,SLOT(EvPrint()));//打印子进程标准输出
 
     tmp->start(program1, qslt);
     tmp->waitForStarted();//等待进程启动
@@ -356,8 +399,16 @@ bool MainWindow::StartSendProcess(const QStringList &qslt )
     //等待1s让进程启动等待查看共享内存结果
     QThread::sleep(1);
     if(ReadShareMemoryData()) {
-    ui->listWidget_2->addItem(item);
-    return true;
+        ui->listWidget_2->addItem(item);//启动子进程成功在UI上提示
+
+        //找到子进程的共享内存
+        QString memID = qslt.at(qslt.indexOf("-p") + 1);//找到共享内存ID
+
+        //为这个子进程实例化共享内存对象
+        shareObjMap[tmp] = new QSharedMemory;
+        shareObjMap[tmp]->setKey(memID);
+
+        return true;
     }
     else {
        return false;
@@ -462,7 +513,7 @@ void MainWindow::on_killProButton_clicked()
 }
 
 
-//产生随机数
+/*产生随机数*/
 int MainWindow::GenerateRandomNumber(int left,int right)
 {
     qsrand(QTime(0,0,0).secsTo(QTime::currentTime()));
@@ -470,6 +521,12 @@ int MainWindow::GenerateRandomNumber(int left,int right)
     qDebug()<<srandNum;
     return srandNum;
 }
+
+
+
+
+
+
 
 
 
