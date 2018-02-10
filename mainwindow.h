@@ -53,7 +53,9 @@ private:
     QSharedMemory *sharememory;
     QStringList startCmdList;
     QTimer *printTimer;//打印共享内存数据的定时器
-    std::map<QProcess*,QSharedMemory*> shareObjMap;//共享内存对象Map
+    std::map<QProcess*,QSharedMemory*> shareObjMap;//共享内存对象Map server
+
+
 private:
     void    DestroyProcess();
     bool    ShowIpList();
@@ -72,7 +74,6 @@ private:
     void    InitShareMem();//初始化共享内存
     QString ChangePort(QString port);
     int     GenerateRandomNumber(int left,int right);//生成一个随机数
-
 public slots:
     void    EvReceiveCommand();
     void    EvNewConnection(qintptr ptr1);

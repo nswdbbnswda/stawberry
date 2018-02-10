@@ -44,8 +44,6 @@ MainWindow::MainWindow(QWidget *parent) :
     connect(printTimer,SIGNAL(timeout()),this,SLOT(EvPrintRate()));
     printTimer->start(1000);
 
-
-
 }
 
 MainWindow::~MainWindow()
@@ -123,7 +121,6 @@ void MainWindow::EvProExit()
     processPointers.removeAt(processPointers.indexOf(tmp));//删除存储在链表中的这个进程指针
 
     //清理共享内存对象
-
     delete shareObjMap[tmp];
     shareObjMap.erase(tmp);
 
@@ -231,25 +228,18 @@ void MainWindow::EvPrint()
 //从共享内存中取出子进程的进度并且输出到UI
 void MainWindow::EvPrintRate()
 {
-     qDebug()<<"Hello,World!";
      qDebug()<<shareObjMap.size();
-    std::map<QProcess*,QSharedMemory*>::iterator iter;//定义一个迭代指针iter
+      std::map<QProcess*,QSharedMemory*>::iterator iter;//定义一个迭代指针iter
     for(iter = shareObjMap.begin(); iter != shareObjMap.end(); iter++) {
         if(!iter->second) return;
-
         if(!iter->second->attach()) return;
         qDebug()<<(char*) iter->second->data();
         QString itemContext = QString((char*)iter->second->data());
-
         itemContext.remove("\n");
-
         if(!procToItem[iter->first]) return;
-
         procToItem[iter->first]->setText(itemContext);
-
         iter->second->detach();
     }
-
 }
 
 
@@ -282,7 +272,6 @@ void MainWindow::EvSendFile(QString qstrIpAddr, QStringList qstrContext)// -s -p
         return;
     }
     QString qsPort = QString::number(GenerateRandomNumber(10000,20000),10);//随机选取一个10000-20000之间的端口作为初始尝试启动发送进程端口
-
     QStringList arguments1;
     arguments1<<qstrContext;
     arguments1.append("-p");
@@ -436,6 +425,14 @@ void MainWindow::StartRecvProcess(const QStringList &qslt)
 
     tmp->start(program1, qslt);
     tmp->waitForStarted();//等待进程启动
+
+
+    //找到子进程的共享内存
+     QString MemID =  "c" + qslt.at(qslt.indexOf("-p") + 1);//找到共享内存ID
+
+     //为这个子进程实例化共享内存对象
+    shareObjMap[tmp] = new QSharedMemory;
+    shareObjMap[tmp]->setKey(MemID);
 
 }
 
