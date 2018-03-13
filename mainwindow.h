@@ -1,4 +1,4 @@
-#ifndef MAINWINDOW_H
+﻿#ifndef MAINWINDOW_H
 #define MAINWINDOW_H
 
 #include <QMainWindow>
@@ -27,6 +27,9 @@
 #include<QColor>
 #include<QSharedMemory>
 #include<QTimer>
+#include<QFile>
+#include<queue>
+
 
 namespace Ui {
 class MainWindow;
@@ -54,8 +57,11 @@ private:
     QStringList startCmdList;
     QTimer *printTimer;//打印共享内存数据的定时器
     std::map<QProcess*,QSharedMemory*> shareObjMap;//共享内存对象Map server
-
-
+    QFile *taskList;//任务列表交互文件
+    QTimer checkTaskList;
+    std::queue<QString> taskQueue;//提交任务的队列
+    std::map<QString,QStringList> taskMap;
+    QTimer executeTask;//定时执行任务
 private:
     void    DestroyProcess();
     bool    ShowIpList();
@@ -69,11 +75,16 @@ private:
     void    AnswerMsg(const ULONG mode,const QHostAddress &_ip);//回复消息
     void    SendControlCommand(const QString &iPAddr,const char *pCmd);
     bool    StartSendProcess(const QStringList &qslt);//发送进程
-    void    StartRecvProcess(const QStringList &qslt );//接收进程
+    QProcess*    StartRecvProcess(const QStringList &qslt );//接收进程
     bool    ReadShareMemoryData();//读取共享内存数据
     void    InitShareMem();//初始化共享内存
     QString ChangePort(QString port);
     int     GenerateRandomNumber(int left,int right);//生成一个随机数
+    QByteArray  taskCommand;//告诉客户端启动参数
+    std::map<QString,QByteArray> ipToTaskLine;//IP地址到任务条的映射
+    QByteArray recvCommand;//接收到服务器指令
+    std::map<QProcess*,QByteArray> procToLog;//进程指针到日志记录的转换
+    QFile *recvList;//接收记录情况
 public slots:
     void    EvReceiveCommand();
     void    EvNewConnection(qintptr ptr1);
@@ -91,6 +102,8 @@ private slots:
     void    on_addUserButton_clicked();
     void    on_sendButton_clicked();
     void    on_killProButton_clicked();
+    void    AcceptTask();//接受任务
+    void    ExeCuteTask();//执行任务
 };
 
 #endif // MAINWINDOW_H
